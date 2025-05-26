@@ -201,7 +201,6 @@ class HungarianDictation:
             if transcribed_text:
                 self.save_transcription(transcribed_text)
                 print(f"✅ Szöveg mentve!")
-                print(f"📝 Felismert szöveg: {transcribed_text}")
             else:
                 print("❌ Nem sikerült szöveget felismerni.")
                 self.logger.warning("Üres szöveg eredmény a Whisper-től")
