@@ -2,11 +2,16 @@
 """
 Diktátum fájl böngésző terminál alkalmazás.
 Lehetővé teszi a diktátum txt fájlok böngészését és szerkesztését vim-ben.
+Email küldés funkció Gmail SMTP-vel.
 """
 
+import json
 import re
+import smtplib
 import subprocess
 import sys
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
 
 try:
@@ -14,6 +19,28 @@ try:
 except ImportError:
     print("A curses modul szükséges a futtatáshoz.")
     sys.exit(1)
+
+CONFIG_FILE = "email_config.json"
+
+def load_config():
+    """Email konfiguráció betöltése"""
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        # Alapértelmezett konfig létrehozása
+        default_config = {
+            "smtp_server": "smtp.gmail.com",
+            "smtp_port": 587,
+            "email": "your_email@gmail.com",
+            "password": "your_app_password",
+            "sender_name": "Diktátum rendszer"
+        }
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(default_config, f, indent=2, ensure_ascii=False)
+        print(f"Alapértelmezett konfiguráció létrehozva: {CONFIG_FILE}")
+        print("Kérlek töltsd ki az email adatokkal!")
+        return default_config
 
 def get_txt_files():
     """Diktátum txt fájlok listázása az időbélyeg kinyerésével"""
@@ -37,6 +64,126 @@ def get_txt_files():
     # Időrend szerinti rendezés (legújabb elől)
     files.sort(key=lambda x: x['display'], reverse=True)
     return files
+
+def read_file_content(file_path):
+    """Fájl tartalmának beolvasása a 4. sortól kezdve"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        # A 4. sortól kezdve (index 3-tól)
+        if len(lines) > 3:
+            content = ''.join(lines[3:]).strip()
+            return content
+        else:
+            return ""
+    except Exception as e:
+        return f"Hiba a fájl olvasásakor: {e}"
+
+def send_email(config, recipient, subject, body):
+    """Email küldése Gmail SMTP-vel"""
+    try:
+        # Email üzenet összeállítása
+        msg = MIMEMultipart()
+        msg['From'] = f"{config['sender_name']} <{config['email']}>"
+        msg['To'] = recipient
+        msg['Subject'] = subject
+        
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        
+        # SMTP kapcsolat
+        server = smtplib.SMTP(config['smtp_server'], config['smtp_port'])
+        server.starttls()
+        server.login(config['email'], config['password'])
+        
+        # Email küldése
+        text = msg.as_string()
+        server.sendmail(config['email'], recipient, text)
+        server.quit()
+        
+        return True, "Email sikeresen elküldve!"
+    
+    except Exception as e:
+        return False, f"Hiba az email küldésekor: {e}"
+
+def email_dialog(stdscr, file_path):
+    """Email küldési dialógus ablak"""
+    height, width = stdscr.getmaxyx()
+    
+    # Dialógus ablak méretei
+    dialog_height = 12
+    dialog_width = min(60, width - 4)
+    start_y = (height - dialog_height) // 2
+    start_x = (width - dialog_width) // 2
+    
+    # Fájl tartalmának beolvasása
+    email_body = read_file_content(file_path)
+    
+    # Dialógus ablak
+    dialog_win = curses.newwin(dialog_height, dialog_width, start_y, start_x)
+    dialog_win.box()
+    dialog_win.addstr(1, 2, "Email küldése", curses.A_BOLD)
+    
+    # Címzett beviteli mező
+    dialog_win.addstr(3, 2, "Címzett:")
+    recipient_win = curses.newwin(1, dialog_width - 12, start_y + 3, start_x + 10)
+    
+    # Tárgy beviteli mező
+    dialog_win.addstr(5, 2, "Tárgy:")
+    subject_win = curses.newwin(1, dialog_width - 10, start_y + 5, start_x + 8)
+    
+    # Törzs előnézet
+    dialog_win.addstr(7, 2, "Törzs előnézet:")
+    preview_text = email_body[:30] + "..." if len(email_body) > 30 else email_body
+    dialog_win.addstr(8, 2, preview_text[:dialog_width-4])
+    
+    # Utasítások
+    dialog_win.addstr(10, 2, "Enter: küldés | Esc: mégse")
+    
+    dialog_win.refresh()
+    
+    # Beviteli mezők kezelése
+    curses.echo()
+    
+    # Címzett bekérése
+    recipient_win.refresh()
+    recipient = recipient_win.getstr(0, 0, dialog_width - 13).decode('utf-8')
+    
+    # Tárgy bekérése
+    subject_win.refresh()
+    subject = subject_win.getstr(0, 0, dialog_width - 11).decode('utf-8')
+    
+    curses.noecho()
+    
+    # Megerősítés
+    dialog_win.addstr(9, 2, f"Küldés: {recipient}")
+    dialog_win.addstr(10, 2, "s: küldés | Esc: mégse   ")
+    dialog_win.refresh()
+    
+    while True:
+        key = dialog_win.getch()
+        if key == ord('s'):
+            # Email küldése
+            config = load_config()
+            success, message = send_email(config, recipient, subject, email_body)
+            
+            # Eredmény megjelenítése
+            dialog_win.clear()
+            dialog_win.box()
+            dialog_win.addstr(1, 2, "Email küldés eredménye", curses.A_BOLD)
+            
+            # Üzenet megjelenítése (több sorban ha szükséges)
+            lines = [message[i:i+dialog_width-4] for i in range(0, len(message), dialog_width-4)]
+            for i, line in enumerate(lines[:6]):  # Max 6 sor
+                dialog_win.addstr(3 + i, 2, line)
+            
+            dialog_win.addstr(dialog_height - 2, 2, "Nyomj egy billentyűt...")
+            dialog_win.refresh()
+            dialog_win.getch()
+            return success
+            
+        elif key == 27:  # Esc
+            return False
 
 def calculate_layout(stdscr, files):
     """Terminál méretből számítjuk ki az elrendezést"""
@@ -107,7 +254,7 @@ def _draw_footer_and_scroll(stdscr, files, cols, visible_rows, scroll_offset, he
     """Footer és scroll indikátor kirajzolása"""
     # Footer
     if height > 2:
-        footer = "↑↓←→: navigáció | Enter: megnyitás | q: kilépés"
+        footer = "↑↓←→: navigáció | Enter: megnyitás | m: email | q: kilépés"
         footer_row = height - 1
         if len(footer) <= width:
             stdscr.addstr(footer_row, 0, footer)
@@ -194,7 +341,12 @@ def main(stdscr):
 
         if key == ord('q'):
             break
-        if key in (curses.KEY_ENTER, 10, 13):
+        elif key == ord('m'):
+            # Email küldés
+            if 0 <= selected_idx < len(files):
+                file_path = files[selected_idx]['full_path']
+                email_dialog(stdscr, file_path)
+        elif key in (curses.KEY_ENTER, 10, 13):
             if 0 <= selected_idx < len(files):
                 file_path = files[selected_idx]['full_path']
                 stdscr = open_file_in_vim(file_path)

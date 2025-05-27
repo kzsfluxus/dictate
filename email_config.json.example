@@ -1,0 +1,7 @@
+{
+  "smtp_server": "smtp.gmail.com",
+  "smtp_port": 587,
+  "email": "your_name@gmail.com",
+  "password": "your_app_password",
+  "sender_name": "Diktátum rendszer"
+}
