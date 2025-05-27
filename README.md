@@ -13,7 +13,7 @@ pip3 install -r requirements.txt
 ```
 > Megjegyzés: szükséges lehet a portaudio19-dev és python3-dev csomagok telepítése.
 
-Majd másoljuk a `dictate.sh` és a `diktatum_browser.sh` fájlokat a PATH-ba. Pl.: $HOME/bin. Ezután a két szkriptben adjuk meg a `dictate` könyvtár abszolút útvonalát.
+Majd másoljuk a `dictate.sh` és a `dictate_browser.sh` fájlokat a PATH-ba. Pl.: $HOME/bin. Ezután a két szkriptben adjuk meg a `dictate` könyvtár abszolút útvonalát.
 
 ## Használat
 
@@ -31,7 +31,7 @@ A felvételekből készült leiratokat a program a `diktatum` alkönyvtárban - 
 
 ### Leirat böngésző
 
-A böngészőt a `diktatum_browser.sh` indítja. Nyilakkal lehet navigálni a leiratok között.
+A böngészőt a `dictate_browser.sh` indítja. Nyilakkal lehet navigálni a leiratok között.
 
 - `Enter`- a leiratot szerkesztésre megnyitja a `vim` szövegszerkesztőben
 - `m` (mail) - megnyit egy dialógusablakot, címzett és tárgy mezőkkel, az email törzse automatikusan a választott leirat lesz.
