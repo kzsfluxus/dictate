@@ -25,7 +25,7 @@ A `dictate.sh` szkript indítja az appot.
 
 - `space` vagy `s` (start) + `Enter` indítja a felvételt
 - `space` vagy `s` (stop) + ``Enter`` leállítja a felvételt
-- `q` + `Enter` kilépés
+- `q` (quit) + `Enter` kilépés
 
 A felvételekből készült leiratokat a program a `diktatum` alkönyvtárban - időbélyeggel ellátva - tárolja.
 
