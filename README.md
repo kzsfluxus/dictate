@@ -8,7 +8,7 @@ Whisper alapú diktáló és emailküldő CLI alkalmazás
 git clone https://github.com/kzsfluxus/dictate
 cd dictate
 python3 -m venv .venv
-pip3 install -r requriments.txt
+pip3 install -r requirements.txt
 ```
 Majd másoljuk a `dictate.sh` és a `dictate_browser.sh` fájlokat a PATH-ba. Pl.: $HOME/bin. Ezután a két szkriptben adjuk meg a `dictate` könyvtár abszolút útvonalát.
 
