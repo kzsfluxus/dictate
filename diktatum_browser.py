@@ -133,7 +133,7 @@ def email_dialog(stdscr, file_path):
 
     # Törzs előnézet
     dialog_win.addstr(7, 2, "Törzs előnézet:")
-    preview_text = email_body[:100] + "..." if len(email_body) > 100 else email_body
+    preview_text = email_body[:56] + "..." if len(email_body) > 56  else email_body
     dialog_win.addstr(8, 2, preview_text[:dialog_width-4])
 
     # Utasítások
