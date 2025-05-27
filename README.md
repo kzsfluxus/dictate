@@ -8,6 +8,7 @@ Whisper alapú diktáló és emailküldő CLI alkalmazás
 git clone https://github.com/kzsfluxus/dictate
 cd dictate
 python3 -m venv .venv
+source .venv/bin/activate
 pip3 install -r requirements.txt
 ```
 > Megjegyzés: szükséges lehet a portaudio19-dev python3-dev csomagok telepítése.
