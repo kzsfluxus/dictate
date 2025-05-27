@@ -10,7 +10,7 @@ cd dictate
 python3 -m venv .venv
 pip3 install -r requriments.txt
 ```
-Majd másoljuk a `dictate.sh` és a `dictate_browser.sh` fájlokat a PATH-ba. Pl.: $HOME/bin.
+Majd másoljuk a `dictate.sh` és a `dictate_browser.sh` fájlokat a PATH-ba. Pl.: $HOME/bin. Ezután a két szkriptben adjuk meg a `dictate` könyvtár abszolút útvonalát.
 
 ## Használat
 
