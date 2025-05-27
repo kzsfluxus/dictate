@@ -12,27 +12,29 @@ pip3 install -r requirements.txt
 ```
 > Megjegyzés: szükséges lehet a portaudio19-dev python3-dev csomagok telepítése.
 
-Majd másoljuk a `dictate.sh` és a `dictate_browser.sh` fájlokat a PATH-ba. Pl.: $HOME/bin. Ezután a két szkriptben adjuk meg a `dictate` könyvtár abszolút útvonalát.
+Majd másoljuk a `dictate.sh` és a `diktatum_browser.sh` fájlokat a PATH-ba. Pl.: $HOME/bin. Ezután a két szkriptben adjuk meg a `dictate` könyvtár abszolút útvonalát.
 
 ## Használat
 
 ### Dictate
 
-Az app az openai_whisper modeljére épül: tiny, base, small, medium és large. Minél nagyobb egy modell annál pontosabb, de lassabb. Alapértelmezésként a base modell van beállítva, ezt a `dictate.sh` fájlban lehet megváltoztatni.
+Az app az openai_whisper modeljére épül: tiny, base, small, medium és large. Minél nagyobb egy modell annál pontosabb, de lassabb a feldolgozás. Alapértelmezésként a base modell van beállítva, ezt a `dictate.sh` fájlban meg lehet változtatni.
 
 A `dictate.sh` szkript indítja az appot.
+
 - `space` vagy `s` + `Enter` indítja a felvételt
 - `space` vagy `s` + 'Enter' leállítja a felvételt
 - `q` + `Enter` kilépés
 
-A felvételekből készült leiratokat a program a diktatum alkönyvtárban - időbélyeggel ellátva - tárolja.
+A felvételekből készült leiratokat a program a `diktatum` alkönyvtárban - időbélyeggel ellátva - tárolja.
 
 ### Leirat böngésző
 
-A böngészőt a `dictate_browser.sh` indítja. Nyilakkal lehet navigálni a leiratok között.
-- `Enter`- a leiratot szerkesztésre megnyitja `vim` szövegszerkesztőben
+A böngészőt a `diktatum_browser.sh` indítja. Nyilakkal lehet navigálni a leiratok között.
+
+- `Enter`- a leiratot szerkesztésre megnyitja a `vim` szövegszerkesztőben
 - `m` (mail) - megnyit egy dialógusablakot, címzett és tárgy mezőkkel, az email törzse automatikusan a választott leirat lesz.
 - `s` (send) - elküldi az emailt
 - `q` (quit) - kilépés
 
-A levelezéshez szükséges adatokat (smtp szerver, emailcím, application password) az `email_config.json` fájlban kell megadni.
+A levelezéshez szükséges adatokat (smtp-szerver, emailcím, application password) az `email_config.json` fájlban kell megadni.
