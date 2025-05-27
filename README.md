@@ -37,5 +37,6 @@ A böngészőt a `dictate_browser.sh` indítja. Nyilakkal lehet navigálni a lei
 - `m` (mail) - megnyit egy dialógusablakot, címzett és tárgy mezőkkel, az email törzse automatikusan a választott leirat lesz.
 - `s` (send) - elküldi az emailt
 - `q` (quit) - kilépés
+- `ESC` - kilepés
 
 A levelezéshez szükséges adatokat (smtp-szerver, emailcím, application password) az `email_config.json` fájlban kell megadni.
