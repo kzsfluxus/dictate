@@ -23,8 +23,8 @@ Az app az openai_whisper modeljére épül: tiny, base, small, medium és large.
 
 A `dictate.sh` szkript indítja az appot.
 
-- `space` vagy `s` + `Enter` indítja a felvételt
-- `space` vagy `s` + 'Enter' leállítja a felvételt
+- `space` vagy `s` (start) + `Enter` indítja a felvételt
+- `space` vagy `s` (stop) + ``Enter`` leállítja a felvételt
 - `q` + `Enter` kilépés
 
 A felvételekből készült leiratokat a program a `diktatum` alkönyvtárban - időbélyeggel ellátva - tárolja.
