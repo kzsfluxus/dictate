@@ -21,10 +21,11 @@ try:
     import select
     import tty
     import termios
+    import numpy as np
 except ImportError as import_error:
     print(f"Hiányzó függőség: {import_error}")
     print("Telepítsd a szükséges csomagokat:")
-    print("pip install openai-whisper pyaudio")
+    print("pip install openai-whisper pyaudio numpy")
     sys.exit(1)
 
 
@@ -183,25 +184,23 @@ class HungarianDictation:
 
     def _check_audio_quality(self, audio_data):
         """Ellenőrzi az audio minőségét és csendet"""
-        import numpy as np
-        
         # Bytes to numpy array
         audio_array = np.frombuffer(b''.join(audio_data), dtype=np.int16)
-        
+
         # Átlagos amplitúdó számítása
         avg_amplitude = np.mean(np.abs(audio_array))
         max_amplitude = np.max(np.abs(audio_array))
-        
+
         # Csend küszöb (ezeket lehet finomhangolni)
         silence_threshold = 500  # Nagyon alacsony hang küszöb
         min_max_amplitude = 1000  # Minimális maximális amplitúdó
-        
-        self.logger.info("Audio statisztikák - Átlag: %.1f, Max: %.1f", 
+
+        self.logger.info("Audio statisztikák - Átlag: %.1f, Max: %.1f",
                         avg_amplitude, max_amplitude)
-        
-        is_mostly_silent = (avg_amplitude < silence_threshold or 
+
+        is_mostly_silent = (avg_amplitude < silence_threshold or
                            max_amplitude < min_max_amplitude)
-        
+
         return not is_mostly_silent, avg_amplitude, max_amplitude
 
     def _is_likely_hallucination(self, text, avg_amplitude):
@@ -222,52 +221,73 @@ class HungarianDictation:
             "comment",
             "komment"
         ]
-        
+
         text_lower = text.lower().strip()
-        
+
         # Ha túl rövid és alacsony az amplitúdó
         if len(text_lower) < 50 and avg_amplitude < 800:
             # Ellenőrizzük a hallucináció mintákat
             for pattern in hallucination_patterns:
                 if pattern in text_lower:
                     return True
-        
+
         # Ha nagyon rövid szöveg és nagyon alacsony hang
         if len(text_lower) < 20 and avg_amplitude < 300:
             return True
-            
+
         return False
+
+    def _create_wav_file(self, temp_filename):
+        """WAV fájl létrehozása az audio adatokból"""
+        # pylint: disable=no-member
+        # Wave_write objektum helyes használata
+        with wave.open(temp_filename, 'wb') as wave_file:
+            wave_file.setnchannels(self.channels)
+            wave_file.setsampwidth(self.audio.get_sample_size(self.format))
+            wave_file.setframerate(self.rate)
+            wave_file.writeframes(b''.join(self.frames))
+
+    def _transcribe_audio(self, temp_filename):
+        """Audio átírása Whisper segítségével"""
+        result = self.model.transcribe(
+            temp_filename,
+            language="hu",  # Magyar nyelv
+            task="transcribe",
+            # További paraméterek a hallucináció csökkentésére
+            temperature=0.0,  # Determinisztikus eredmény
+            no_speech_threshold=0.6,  # Magasabb küszöb a csendes részekhez
+            logprob_threshold=-1.0,  # Alacsony valószínűségű szövegek kiszűrése
+        )
+        return result
 
     def _process_audio(self):
         """Feldolgozza a rögzített hangot"""
         # Audio minőség ellenőrzése
         try:
             has_sound, avg_amp, max_amp = self._check_audio_quality(self.frames)
-            
+
             if not has_sound:
-                print("❌ Túl halk vagy csendes felvétel. Próbálj hangosabban beszélni!")
-                self.logger.warning("Audio túl halk - átlag: %.1f, max: %.1f", avg_amp, max_amp)
+                print("❌ Túl halk vagy csendes felvétel. "
+                      "Próbálj hangosabban beszélni!")
+                self.logger.warning("Audio túl halk - átlag: %.1f, max: %.1f",
+                                   avg_amp, max_amp)
                 return
-                
-        except ImportError:
+
+        except NameError:
             # Ha nincs numpy, folytatjuk numpy nélkül
-            self.logger.warning("NumPy nem elérhető, audio minőség ellenőrzés kihagyva")
+            self.logger.warning("NumPy nem elérhető, "
+                               "audio minőség ellenőrzés kihagyva")
             avg_amp = 1000  # Alapértelmezett érték
-        except Exception as error:
+        except (ValueError, TypeError) as error:
             self.logger.warning("Audio minőség ellenőrzési hiba: %s", error)
             avg_amp = 1000
-        
+
         # Ideiglenes fájl létrehozása
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
             temp_filename = temp_file.name
 
-            # WAV fájl írása
-            with wave.open(temp_filename, 'wb') as wave_file:
-                wave_file.setnchannels(self.channels)
-                wave_file.setsampwidth(self.audio.get_sample_size(self.format))
-                wave_file.setframerate(self.rate)
-                wave_file.writeframes(b''.join(self.frames))
-
+        # WAV fájl írása
+        self._create_wav_file(temp_filename)
         self.logger.info("Ideiglenes WAV fájl létrehozva: %s", temp_filename)
 
         # Whisper feldolgozás
@@ -275,30 +295,25 @@ class HungarianDictation:
             print("🤖 Beszédfelismerés folyamatban...")
             self.logger.info("Whisper feldolgozás elkezdve")
 
-            result = self.model.transcribe(
-                temp_filename,
-                language="hu",  # Magyar nyelv
-                task="transcribe",
-                # További paraméterek a hallucináció csökkentésére
-                temperature=0.0,  # Determinisztikus eredmény
-                no_speech_threshold=0.6,  # Magasabb küszöb a csendes részekhez
-                logprob_threshold=-1.0,  # Alacsonyabb valószínűségű szövegek kiszűrése
-            )
+            result = self._transcribe_audio(temp_filename)
 
             transcribed_text = result["text"].strip()
             segments = result.get('segments', [])
             no_speech_prob = result.get('no_speech_prob', 0.0)
-            
-            self.logger.info("Whisper eredmény: '%s' (szegmensek: %d, no_speech_prob: %.3f)",
-                           transcribed_text, len(segments), no_speech_prob)
+
+            self.logger.info("Whisper eredmény: '%s' (szegmensek: %d, "
+                           "no_speech_prob: %.3f)", transcribed_text,
+                           len(segments), no_speech_prob)
 
             # Ellenőrizzük a hallucináció valószínűségét
             if transcribed_text:
                 if no_speech_prob > 0.8:
                     print("❌ Nagy valószínűséggel nincs beszéd a felvételben.")
-                    self.logger.info("Magas no_speech_prob (%.3f), eredmény elvetve", no_speech_prob)
+                    self.logger.info("Magas no_speech_prob (%.3f), "
+                                   "eredmény elvetve", no_speech_prob)
                 elif self._is_likely_hallucination(transcribed_text, avg_amp):
-                    print("❌ A felismert szöveg valószínűleg hallucináció (háttérzaj).")
+                    print("❌ A felismert szöveg valószínűleg hallucináció "
+                          "(háttérzaj).")
                     self.logger.info("Hallucináció gyanú: '%s'", transcribed_text)
                 else:
                     self.save_transcription(transcribed_text)
@@ -307,7 +322,7 @@ class HungarianDictation:
                 print("❌ Nem sikerült szöveget felismerni.")
                 self.logger.warning("Üres szöveg eredmény a Whisper-től")
 
-        except (OSError, RuntimeError, ValueError, whisper.DecodingError) as error:
+        except (OSError, RuntimeError, ValueError) as error:
             print(f"Hiba a beszédfelismerés során: {error}")
             self.logger.error("Whisper feldolgozási hiba: %s", error)
         finally:
@@ -394,7 +409,7 @@ class HungarianDictation:
         print()
         print("Irányítás:")
         print("  SPACE vagy s + ENTER - Felvétel indítása/leállítása")
-        print("  q + ENTER       - Kilépés")
+        print("  q + ENTER            - Kilépés")
         print(f"  Fájlok mentési helye: {self.output_dir.absolute()}")
         print(f"  Logfájl: {self.output_dir.absolute()}/dictate.log")
         print()
