@@ -110,7 +110,7 @@ def email_dialog(stdscr, file_path):
     height, width = stdscr.getmaxyx()
 
     # Dialógus ablak méretei
-    dialog_height = 16
+    dialog_height = 14
     dialog_width = min(64, width - 4)
     start_y = (height - dialog_height) // 2
     start_x = (width - dialog_width) // 2
@@ -133,11 +133,11 @@ def email_dialog(stdscr, file_path):
 
     # Törzs előnézet
     dialog_win.addstr(7, 2, "Törzs előnézet:")
-    preview_text = email_body[:30] + "..." if len(email_body) > 30 else email_body
+    preview_text = email_body[:100] + "..." if len(email_body) > 100 else email_body
     dialog_win.addstr(8, 2, preview_text[:dialog_width-4])
 
     # Utasítások
-    dialog_win.addstr(14, 2, "Enter: tovább")
+    dialog_win.addstr(12, 2, "Enter: tovább")
 
     dialog_win.refresh()
 
@@ -155,8 +155,8 @@ def email_dialog(stdscr, file_path):
     curses.noecho()
 
     # Megerősítés
-    dialog_win.addstr(9, 2, f"Küldés: {recipient}")
-    dialog_win.addstr(14, 2, "s: küldés | Esc: mégse   ")
+    dialog_win.addstr(10, 2, f"Küldés: {recipient}")
+    dialog_win.addstr(12, 2, "s: küldés | Esc: mégse   ")
     dialog_win.refresh()
 
     while True:
