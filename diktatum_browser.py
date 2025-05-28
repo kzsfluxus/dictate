@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Diktátum fájl böngésző terminál alkalmazás.
+Leirat fájl böngésző terminál alkalmazás.
 Lehetővé teszi a diktátum txt fájlok böngészését és szerkesztését vim-ben.
 Email küldés funkció Gmail SMTP-vel és címlista kezeléssel.
 """
@@ -444,7 +444,7 @@ def draw_screen(stdscr, files, selected_idx, scroll_offset):
     height, width = stdscr.getmaxyx()
 
     # Header
-    title = "Diktátum fájlok"
+    title = "Leirat fájlok"
     stdscr.addstr(0, (width - len(title)) // 2, title, curses.A_BOLD)
 
     # Betekintés megjelenítése
