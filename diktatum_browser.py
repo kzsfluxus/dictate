@@ -55,7 +55,7 @@ def load_config():
         return default_config
 
 def load_email_addresses():
-    """Email címek betöltése a fájlból"""
+    """Emailcímek betöltése a fájlból"""
     try:
         with open(EMAILS_FILE, 'r', encoding='utf-8') as file:
             addresses = [line.strip() for line in file.readlines() if line.strip()]
@@ -64,7 +64,7 @@ def load_email_addresses():
         return []
 
 def save_email_address(email):
-    """Email cím hozzáadása a listához ha még nincs benne"""
+    """Emailcím hozzáadása a listához ha még nincs benne"""
     addresses = load_email_addresses()
 
     if email and email not in addresses:
@@ -76,7 +76,7 @@ def save_email_address(email):
                 file.write(addr + '\n')
 
 def email_address_selector(stdscr):
-    """Email cím választó ablak"""
+    """Emailcím választó ablak"""
     addresses = load_email_addresses()
 
     if not addresses:
@@ -90,7 +90,7 @@ def email_address_selector(stdscr):
         dialog_win = curses.newwin(dialog_height, dialog_width, start_y, start_x)
         dialog_win.box()
         dialog_win.addstr(1, 2, "Címlista üres", curses.A_BOLD)
-        dialog_win.addstr(3, 2, "Még nincsenek mentett email címek.")
+        dialog_win.addstr(3, 2, "Még nincsenek mentett emailcímek.")
         dialog_win.addstr(5, 2, "Nyomj egy billentyűt...")
         dialog_win.refresh()
         dialog_win.getch()
@@ -113,7 +113,7 @@ def email_address_selector(stdscr):
     while True:
         dialog_win.clear()
         dialog_win.box()
-        dialog_win.addstr(1, 2, "Email cím választása", curses.A_BOLD)
+        dialog_win.addstr(1, 2, "Emailcím választása", curses.A_BOLD)
 
         # Navigációs útmutató
         nav_text = "↑↓: navigálás | Enter: választás | Esc: kilépés"
@@ -302,7 +302,7 @@ def get_email_inputs(stdscr, dialog_config):
                 recipient = selected_email
         elif key == ord('r'):
             # Manuális címbevitel
-            dialog_win.addstr(7, 2, "Email cím:")
+            dialog_win.addstr(7, 2, "Emailcím:")
             dialog_win.refresh()
 
             recipient_win = curses.newwin(1, dialog_config['dialog_width'] - 14,
@@ -386,7 +386,7 @@ def email_dialog(stdscr, file_path):
             config = load_config()
             success, message = send_email(config, recipient, subject, email_body)
 
-            # Email cím mentése ha sikeres volt a küldés
+            # Emailcím mentése ha sikeres volt a küldés
             if success:
                 save_email_address(recipient)
 
