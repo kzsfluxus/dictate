@@ -76,8 +76,18 @@ def read_file_content(file_path):
             content = ''.join(lines[3:]).strip()
             return content
         return ""
-    except Exception as err:
+    except (FileNotFoundError, PermissionError, UnicodeDecodeError) as err:
         return f"Hiba a fájl olvasásakor: {err}"
+
+def send_email_smtp(server_config, message_data):
+    """SMTP email küldés - külön funkció a kivételkezelés javításához"""
+    server = smtplib.SMTP(server_config['smtp_server'], server_config['smtp_port'])
+    server.starttls()
+    server.login(server_config['email'], server_config['password'])
+
+    text = message_data['msg'].as_string()
+    server.sendmail(server_config['email'], message_data['recipient'], text)
+    server.quit()
 
 def send_email(config, recipient, subject, body):
     """Email küldése Gmail SMTP-vel"""
@@ -91,22 +101,16 @@ def send_email(config, recipient, subject, body):
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
 
         # SMTP kapcsolat
-        server = smtplib.SMTP(config['smtp_server'], config['smtp_port'])
-        server.starttls()
-        server.login(config['email'], config['password'])
-
-        # Email küldése
-        text = msg.as_string()
-        server.sendmail(config['email'], recipient, text)
-        server.quit()
+        message_data = {'msg': msg, 'recipient': recipient}
+        send_email_smtp(config, message_data)
 
         return True, "Email sikeresen elküldve!"
 
-    except Exception as err:
+    except (smtplib.SMTPException, ConnectionError, OSError) as err:
         return False, f"Hiba az email küldésekor: {err}"
 
-def email_dialog(stdscr, file_path):
-    """Email küldési dialógus ablak"""
+def create_email_dialog_window(stdscr):
+    """Email dialógus ablak létrehozása"""
     height, width = stdscr.getmaxyx()
 
     # Dialógus ablak méretei
@@ -115,44 +119,85 @@ def email_dialog(stdscr, file_path):
     start_y = (height - dialog_height) // 2
     start_x = (width - dialog_width) // 2
 
-    # Fájl tartalmának beolvasása
-    email_body = read_file_content(file_path)
+    return {
+        'dialog_height': dialog_height,
+        'dialog_width': dialog_width,
+        'start_y': start_y,
+        'start_x': start_x
+    }
 
-    # Dialógus ablak
-    dialog_win = curses.newwin(dialog_height, dialog_width, start_y, start_x)
+def setup_dialog_ui(dialog_win, dialog_config, email_body):
+    """Email dialógus UI elemeinek beállítása"""
     dialog_win.box()
     dialog_win.addstr(1, 2, "Email küldése", curses.A_BOLD)
 
-    # Címzett beviteli mező
+    # Címzett és tárgy beviteli mezők
     dialog_win.addstr(3, 2, "Címzett:")
-    recipient_win = curses.newwin(1, dialog_width - 12, start_y + 3, start_x + 10)
-
-    # Tárgy beviteli mező
     dialog_win.addstr(5, 2, "Tárgy:")
-    subject_win = curses.newwin(1, dialog_width - 10, start_y + 5, start_x + 8)
 
     # Törzs előnézet
     dialog_win.addstr(7, 2, "Törzs előnézet:")
-    preview_text = email_body[:56] + "..." if len(email_body) > 56  else email_body
-    dialog_win.addstr(8, 2, preview_text[:dialog_width-4])
+    preview_text = email_body[:56] + "..." if len(email_body) > 56 else email_body
+    dialog_win.addstr(8, 2, preview_text[:dialog_config['dialog_width']-4])
 
-    # Utasítások
     dialog_win.addstr(12, 2, "Enter: tovább")
-
     dialog_win.refresh()
 
-    # Beviteli mezők kezelése
+def get_email_inputs(dialog_config):
+    """Email beviteli mezők kezelése"""
+    # Címzett beviteli mező
+    recipient_win = curses.newwin(1, dialog_config['dialog_width'] - 12,
+                                 dialog_config['start_y'] + 3, dialog_config['start_x'] + 10)
+
+    # Tárgy beviteli mező
+    subject_win = curses.newwin(1, dialog_config['dialog_width'] - 10,
+                               dialog_config['start_y'] + 5, dialog_config['start_x'] + 8)
+
     curses.echo()
 
     # Címzett bekérése
     recipient_win.refresh()
-    recipient = recipient_win.getstr(0, 0, dialog_width - 13).decode('utf-8')
+    recipient = recipient_win.getstr(0, 0, dialog_config['dialog_width'] - 13).decode('utf-8')
 
     # Tárgy bekérése
     subject_win.refresh()
-    subject = subject_win.getstr(0, 0, dialog_width - 11).decode('utf-8')
+    subject = subject_win.getstr(0, 0, dialog_config['dialog_width'] - 11).decode('utf-8')
 
     curses.noecho()
+
+    return recipient, subject
+
+def show_email_result(dialog_win, dialog_config, message):
+    """Email küldés eredményének megjelenítése"""
+    dialog_win.clear()
+    dialog_win.box()
+    dialog_win.addstr(1, 2, "Email küldés eredménye", curses.A_BOLD)
+
+    # Üzenet megjelenítése (több sorban ha szükséges)
+    lines = [message[i:i+dialog_config['dialog_width']-4]
+             for i in range(0, len(message), dialog_config['dialog_width']-4)]
+    for i, line in enumerate(lines[:6]):  # Max 6 sor
+        dialog_win.addstr(3 + i, 2, line)
+
+    dialog_win.addstr(dialog_config['dialog_height'] - 2, 2, "Nyomj egy billentyűt...")
+    dialog_win.refresh()
+    dialog_win.getch()
+
+def email_dialog(stdscr, file_path):
+    """Email küldési dialógus ablak"""
+    dialog_config = create_email_dialog_window(stdscr)
+
+    # Fájl tartalmának beolvasása
+    email_body = read_file_content(file_path)
+
+    # Dialógus ablak
+    dialog_win = curses.newwin(dialog_config['dialog_height'], dialog_config['dialog_width'],
+                              dialog_config['start_y'], dialog_config['start_x'])
+
+    setup_dialog_ui(dialog_win, dialog_config, email_body)
+
+    # Beviteli mezők kezelése
+    recipient, subject = get_email_inputs(dialog_config)
 
     # Megerősítés
     dialog_win.addstr(10, 2, f"Küldés: {recipient}")
@@ -167,18 +212,7 @@ def email_dialog(stdscr, file_path):
             success, message = send_email(config, recipient, subject, email_body)
 
             # Eredmény megjelenítése
-            dialog_win.clear()
-            dialog_win.box()
-            dialog_win.addstr(1, 2, "Email küldés eredménye", curses.A_BOLD)
-
-            # Üzenet megjelenítése (több sorban ha szükséges)
-            lines = [message[i:i+dialog_width-4] for i in range(0, len(message), dialog_width-4)]
-            for i, line in enumerate(lines[:6]):  # Max 6 sor
-                dialog_win.addstr(3 + i, 2, line)
-
-            dialog_win.addstr(dialog_height - 2, 2, "Nyomj egy billentyűt...")
-            dialog_win.refresh()
-            dialog_win.getch()
+            show_email_result(dialog_win, dialog_config, message)
             return success
 
         if key == 27:  # Esc
@@ -210,7 +244,7 @@ def calculate_layout(stdscr, files):
     # Lapozni kell
     return cols, available_rows, files
 
-def draw_screen(stdscr, files, selected_idx, scroll_offset, cols, visible_rows):
+def draw_screen(stdscr, files, selected_idx, scroll_offset):
     """Képernyő kirajzolása - egyszerűsített verzió a túl sok ág elkerülésére"""
     stdscr.clear()
     height, width = stdscr.getmaxyx()
@@ -225,14 +259,17 @@ def draw_screen(stdscr, files, selected_idx, scroll_offset, cols, visible_rows):
         stdscr.refresh()
         return
 
+    cols, visible_rows = calculate_layout(stdscr, files)[:2]
+
     # Fájlok megjelenítése
-    _draw_files(stdscr, files, selected_idx, scroll_offset, cols, visible_rows, height, width)
-    _draw_footer_and_scroll(stdscr, files, cols, visible_rows, scroll_offset, height, width)
+    _draw_files(stdscr, files, selected_idx, scroll_offset, cols, visible_rows)
+    _draw_footer_and_scroll(stdscr, files, cols, visible_rows, scroll_offset)
 
     stdscr.refresh()
 
-def _draw_files(stdscr, files, selected_idx, scroll_offset, cols, visible_rows, height, width):
+def _draw_files(stdscr, files, selected_idx, scroll_offset, cols, visible_rows):
     """Fájlok kirajzolása"""
+    height, width = stdscr.getmaxyx()
     start_row = 2
     item_width = max(len(f['display']) for f in files) + 4
 
@@ -249,8 +286,10 @@ def _draw_files(stdscr, files, selected_idx, scroll_offset, cols, visible_rows, 
         if row < height - 1 and col + len(file_info['display']) < width:
             stdscr.addstr(row, col, file_info['display'], attr)
 
-def _draw_footer_and_scroll(stdscr, files, cols, visible_rows, scroll_offset, height, width):
+def _draw_footer_and_scroll(stdscr, files, cols, visible_rows, scroll_offset):
     """Footer és scroll indikátor kirajzolása"""
+    height, width = stdscr.getmaxyx()
+
     # Footer
     if height > 2:
         footer = "↑↓←→: navigáció | Enter: megnyitás | m: email | q: kilépés"
@@ -328,7 +367,7 @@ def main(stdscr):
         # Kiválasztott elem láthatóságának ellenőrzése
         scroll_offset = _update_scroll_offset(selected_idx, scroll_offset, cols, visible_rows)
 
-        draw_screen(stdscr, files, selected_idx, scroll_offset, cols, visible_rows)
+        draw_screen(stdscr, files, selected_idx, scroll_offset)
 
         if not files:
             key = stdscr.getch()
@@ -361,5 +400,5 @@ if __name__ == "__main__":
         curses.wrapper(main)
     except KeyboardInterrupt:
         print("\nKilépés...")
-    except Exception as error:
+    except (OSError, RuntimeError) as error:
         print(f"Hiba: {error}")
