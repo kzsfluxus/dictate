@@ -256,7 +256,7 @@ def setup_dialog_ui(dialog_win, dialog_config, email_body):
     dialog_win.addstr(8, 2, preview_text[:dialog_config['dialog_width']-4])
 
     # Új menüpont
-    dialog_win.addstr(10, 2, "a: cím választása listából")
+    dialog_win.addstr(10, 2, "a: címzett választása listából")
     dialog_win.addstr(14, 2, "Enter: tovább")
     dialog_win.refresh()
 
@@ -277,8 +277,8 @@ def get_email_inputs(stdscr, dialog_config):
         dialog_win.addstr(5, 2, f"Tárgy: {subject}")
 
         if not recipient:
-            dialog_win.addstr(9, 2, "a: cím választása listából")
-            dialog_win.addstr(10, 2, "r: cím manuális bevitele")
+            dialog_win.addstr(9, 2, "a: címzett választása listából")
+            dialog_win.addstr(10, 2, "r: címzett manuális bevitele")
             dialog_win.addstr(11, 2, "Esc: mégse")
         elif not subject:
             dialog_win.addstr(9, 2, "t: tárgy bevitele")
