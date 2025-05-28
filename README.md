@@ -5,7 +5,7 @@ Whisper alapú diktáló és emailküldő CLI alkalmazás
 ## Telepítés
 
 ```bash
-git clone https://github.com/kzsfluxus/dictate
+git clone https://github.com/kzsfluxus/dictate.git
 cd dictate
 python3 -m venv .venv
 source .venv/bin/activate
