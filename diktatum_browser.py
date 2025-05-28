@@ -194,6 +194,21 @@ def read_file_content(file_path):
     except (FileNotFoundError, PermissionError, UnicodeDecodeError) as err:
         return f"Hiba a fájl olvasásakor: {err}"
 
+def get_file_preview(file_path):
+    """Fájl 4. sorának első 50 karakterének lekérése"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+        
+        # A 4. sor (index 3) első 50 karaktere
+        if len(lines) > 3:
+            fourth_line = lines[3].strip()
+            if fourth_line:
+                return fourth_line if len(fourth_line) <= 60 else fourth_line[:60] + ' ...'
+        return ""
+    except (FileNotFoundError, PermissionError, UnicodeDecodeError):
+        return "Hiba a fájl olvasásakor"
+
 def send_email_smtp(server_config, message_data):
     """SMTP email küldés - külön funkció a kivételkezelés javításához"""
     server = smtplib.SMTP(server_config['smtp_server'], server_config['smtp_port'])
@@ -398,7 +413,7 @@ def email_dialog(stdscr, file_path):
             return False
 
 def calculate_layout(stdscr, files):
-    """Terminál méretből számítjuk ki az elrendezést"""
+    """Terminál méretből számítjuk ki az elrendezést - módosítva a betekintéshez"""
     height, width = stdscr.getmaxyx()
 
     # Tájékozódáshoz nézzük meg egy elem szélességét
@@ -414,8 +429,8 @@ def calculate_layout(stdscr, files):
     # Hány sor szükséges
     rows_needed = (len(files) + cols - 1) // cols
 
-    # Elérhető sorok (header és footer miatt -3)
-    available_rows = height - 3
+    # Elérhető sorok (header + betekintés + elválasztó + footer miatt -6)
+    available_rows = height - 6
 
     if rows_needed <= available_rows:
         # Minden fér egy képernyőre
@@ -424,13 +439,28 @@ def calculate_layout(stdscr, files):
     return cols, available_rows, files
 
 def draw_screen(stdscr, files, selected_idx, scroll_offset):
-    """Képernyő kirajzolása - egyszerűsített verzió a túl sok ág elkerülésére"""
+    """Képernyő kirajzolása betekintéssel"""
     stdscr.clear()
     height, width = stdscr.getmaxyx()
 
     # Header
     title = "Diktátum fájlok"
     stdscr.addstr(0, (width - len(title)) // 2, title, curses.A_BOLD)
+
+    # Betekintés megjelenítése
+    preview_text = ""
+    if files and 0 <= selected_idx < len(files):
+        preview_text = get_file_preview(files[selected_idx]['full_path'])
+    
+    # Betekintés sor (csak ha van szöveg)
+    if preview_text:
+        # Szöveg levágása ha túl hosszú a képernyőhöz
+        display_preview = preview_text[:width-2] if len(preview_text) > width-2 else preview_text
+        stdscr.addstr(1, 0, display_preview)
+    
+    # Elválasztó vonal (szaggatott)
+    separator = "-" * width
+    stdscr.addstr(2, 0, separator)
 
     if not files:
         stdscr.addstr(height // 2, (width - len("Nincsenek txt fájlok")) // 2,
@@ -440,16 +470,16 @@ def draw_screen(stdscr, files, selected_idx, scroll_offset):
 
     cols, visible_rows = calculate_layout(stdscr, files)[:2]
 
-    # Fájlok megjelenítése
+    # Fájlok megjelenítése (3. sortól kezdve a betekintés és elválasztó miatt)
     _draw_files(stdscr, files, selected_idx, scroll_offset, cols, visible_rows)
     _draw_footer_and_scroll(stdscr, files, cols, visible_rows, scroll_offset)
 
     stdscr.refresh()
 
 def _draw_files(stdscr, files, selected_idx, scroll_offset, cols, visible_rows):
-    """Fájlok kirajzolása"""
+    """Fájlok kirajzolása - módosítva a betekintéshez"""
     height, width = stdscr.getmaxyx()
-    start_row = 2
+    start_row = 3  # Módosítva: 3. sortól kezdjük a betekintés és elválasztó miatt
     item_width = max(len(f['display']) for f in files) + 4
 
     visible_files = files[scroll_offset:scroll_offset + (cols * visible_rows)]
@@ -476,11 +506,11 @@ def _draw_footer_and_scroll(stdscr, files, cols, visible_rows, scroll_offset):
         if len(footer) <= width:
             stdscr.addstr(footer_row, 0, footer)
 
-    # Scroll indikátor
+    # Scroll indikátor (módosítva: a 2. sorba kerül az elválasztó vonal mellé)
     if len(files) > cols * visible_rows:
-        progress = f"{scroll_offset // cols + 1}/{(len(files) + cols - 1) // cols}"
+        progress = f" {scroll_offset // cols + 1}/{(len(files) + cols - 1) // cols}"
         if len(progress) <= width:
-            stdscr.addstr(1, width - len(progress), progress)
+            stdscr.addstr(2, width - len(progress), progress)
 
 def open_file_in_vim(file_path):
     """Fájl megnyitása vim-ben"""
