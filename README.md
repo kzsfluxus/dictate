@@ -35,8 +35,14 @@ A böngészőt a `dictate_browser.sh` indítja. Nyilakkal lehet navigálni a lei
 
 - `Enter`- a leiratot szerkesztésre megnyitja a `vim` szövegszerkesztőben
 - `m` (mail) - megnyit egy dialógusablakot, címzett és tárgy mezőkkel, az email törzse automatikusan a választott leirat lesz.
+
+Email
+
+- `a` (address_list) - emailcím választása listából
+- `r` (recipient) - cím beírása, a levél elküldése után automatikusan bekerül a címlistába
+- `t` (tárgy) - az email tárgyának megadása
 - `s` (send) - elküldi az emailt
 - `q` (quit) - kilépés
-- `ESC` - kilepés
+- `Esc` - kilépés
 
 A levelezéshez szükséges adatokat (smtp-szerver, emailcím, application password) az `email_config.json` fájlban kell megadni.
