@@ -2,10 +2,11 @@
 """
 Diktátum fájl böngésző terminál alkalmazás.
 Lehetővé teszi a diktátum txt fájlok böngészését és szerkesztését vim-ben.
-Email küldés funkció Gmail SMTP-vel.
+Email küldés funkció Gmail SMTP-vel és címlista kezeléssel.
 """
 
 import json
+import os
 import re
 import smtplib
 import subprocess
@@ -21,6 +22,17 @@ except ImportError:
     sys.exit(1)
 
 CONFIG_FILE = "email_config.json"
+ADDRESSES_DIR = "addresses"
+EMAILS_FILE = os.path.join(ADDRESSES_DIR, "emails.txt")
+
+def ensure_addresses_directory():
+    """Addresses mappa és emails.txt fájl létrehozása ha szükséges"""
+    if not os.path.exists(ADDRESSES_DIR):
+        os.makedirs(ADDRESSES_DIR)
+
+    if not os.path.exists(EMAILS_FILE):
+        with open(EMAILS_FILE, 'w', encoding='utf-8') as file:
+            file.write("")
 
 def load_config():
     """Email konfiguráció betöltése"""
@@ -41,6 +53,109 @@ def load_config():
         print(f"Alapértelmezett konfiguráció létrehozva: {CONFIG_FILE}")
         print("Kérlek töltsd ki az email adatokkal!")
         return default_config
+
+def load_email_addresses():
+    """Email címek betöltése a fájlból"""
+    try:
+        with open(EMAILS_FILE, 'r', encoding='utf-8') as file:
+            addresses = [line.strip() for line in file.readlines() if line.strip()]
+        return sorted(addresses)
+    except FileNotFoundError:
+        return []
+
+def save_email_address(email):
+    """Email cím hozzáadása a listához ha még nincs benne"""
+    addresses = load_email_addresses()
+
+    if email and email not in addresses:
+        addresses.append(email)
+        addresses.sort()
+
+        with open(EMAILS_FILE, 'w', encoding='utf-8') as file:
+            for addr in addresses:
+                file.write(addr + '\n')
+
+def email_address_selector(stdscr):
+    """Email cím választó ablak"""
+    addresses = load_email_addresses()
+
+    if not addresses:
+        # Üres lista esetén
+        height, width = stdscr.getmaxyx()
+        dialog_height = 7
+        dialog_width = 50
+        start_y = (height - dialog_height) // 2
+        start_x = (width - dialog_width) // 2
+
+        dialog_win = curses.newwin(dialog_height, dialog_width, start_y, start_x)
+        dialog_win.box()
+        dialog_win.addstr(1, 2, "Címlista üres", curses.A_BOLD)
+        dialog_win.addstr(3, 2, "Még nincsenek mentett email címek.")
+        dialog_win.addstr(5, 2, "Nyomj egy billentyűt...")
+        dialog_win.refresh()
+        dialog_win.getch()
+        return None
+
+    # Címválasztó ablak
+    height, width = stdscr.getmaxyx()
+    dialog_height = min(20, height - 4)
+    dialog_width = min(60, width - 4)
+    start_y = (height - dialog_height) // 2
+    start_x = (width - dialog_width) // 2
+
+    dialog_win = curses.newwin(dialog_height, dialog_width, start_y, start_x)
+    dialog_win.keypad(True)  # ← Ez a fontos sor!
+
+    selected_idx = 0
+    scroll_offset = 0
+    visible_items = dialog_height - 4  # Hely a lista elemeinek
+
+    while True:
+        dialog_win.clear()
+        dialog_win.box()
+        dialog_win.addstr(1, 2, "Email cím választása", curses.A_BOLD)
+
+        # Navigációs útmutató
+        nav_text = "↑↓: navigálás | Enter: választás | Esc: kilépés"
+        dialog_win.addstr(dialog_height - 2, 2, nav_text)
+
+        # Lista megjelenítése
+        start_display = scroll_offset
+        end_display = min(start_display + visible_items, len(addresses))
+
+        for i, addr in enumerate(addresses[start_display:end_display]):
+            y_pos = 2 + i
+            display_idx = start_display + i
+
+            # Kiválasztott elem kiemelése
+            if display_idx == selected_idx:
+                attr = curses.A_REVERSE
+            else:
+                attr = curses.A_NORMAL
+
+            # Cím megjelenítése (csonkolva ha túl hosszú)
+            display_addr = addr[:dialog_width - 6] + "..." if len(addr) > dialog_width - 6 else addr
+            dialog_win.addstr(y_pos, 2, display_addr, attr)
+
+        dialog_win.refresh()
+
+        key = dialog_win.getch()
+
+        if key == 27:  # Esc
+            return None
+        if key in (curses.KEY_ENTER, 10, 13):  # Enter
+            return addresses[selected_idx]
+        elif key in (curses.KEY_UP, ord('k')):  # Fel nyíl vagy k
+            if selected_idx > 0:
+                selected_idx -= 1
+                if selected_idx < scroll_offset:
+                    scroll_offset = selected_idx
+        elif key in (curses.KEY_DOWN, ord('j')):  # Le nyíl vagy j
+            if selected_idx < len(addresses) - 1:
+                selected_idx += 1
+                if selected_idx >= scroll_offset + visible_items:
+                    scroll_offset = selected_idx - visible_items + 1
+
 
 def get_txt_files():
     """Diktátum txt fájlok listázása az időbélyeg kinyerésével"""
@@ -114,7 +229,7 @@ def create_email_dialog_window(stdscr):
     height, width = stdscr.getmaxyx()
 
     # Dialógus ablak méretei
-    dialog_height = 14
+    dialog_height = 16
     dialog_width = min(64, width - 4)
     start_y = (height - dialog_height) // 2
     start_x = (width - dialog_width) // 2
@@ -140,32 +255,81 @@ def setup_dialog_ui(dialog_win, dialog_config, email_body):
     preview_text = email_body[:56] + "..." if len(email_body) > 56 else email_body
     dialog_win.addstr(8, 2, preview_text[:dialog_config['dialog_width']-4])
 
-    dialog_win.addstr(12, 2, "Enter: tovább")
+    # Új menüpont
+    dialog_win.addstr(10, 2, "a: cím választása listából")
+    dialog_win.addstr(14, 2, "Enter: tovább")
     dialog_win.refresh()
 
-def get_email_inputs(dialog_config):
-    """Email beviteli mezők kezelése"""
-    # Címzett beviteli mező
-    recipient_win = curses.newwin(1, dialog_config['dialog_width'] - 12,
-                                 dialog_config['start_y'] + 3, dialog_config['start_x'] + 10)
+def get_email_inputs(stdscr, dialog_config):
+    """Email beviteli mezők kezelése címválasztó opcióval"""
+    # Email dialógus ablak újrarajzolása címválasztó opcióval
+    dialog_win = curses.newwin(dialog_config['dialog_height'], dialog_config['dialog_width'],
+                              dialog_config['start_y'], dialog_config['start_x'])
 
-    # Tárgy beviteli mező
-    subject_win = curses.newwin(1, dialog_config['dialog_width'] - 10,
-                               dialog_config['start_y'] + 5, dialog_config['start_x'] + 8)
+    recipient = ""
+    subject = ""
 
-    curses.echo()
+    while True:
+        dialog_win.clear()
+        dialog_win.box()
+        dialog_win.addstr(1, 2, "Email küldése", curses.A_BOLD)
+        dialog_win.addstr(3, 2, f"Címzett: {recipient}")
+        dialog_win.addstr(5, 2, f"Tárgy: {subject}")
 
-    # Címzett bekérése
-    recipient_win.refresh()
-    recipient = recipient_win.getstr(0, 0, dialog_config['dialog_width'] - 13).decode('utf-8')
+        if not recipient:
+            dialog_win.addstr(9, 2, "a: cím választása listából")
+            dialog_win.addstr(10, 2, "r: cím manuális bevitele")
+            dialog_win.addstr(11, 2, "Esc: mégse")
+        elif not subject:
+            dialog_win.addstr(9, 2, "t: tárgy bevitele")
+            dialog_win.addstr(10, 2, "Esc: vissza")
+        else:
+            dialog_win.addstr(9, 2, "Enter: email megtekintése")
+            dialog_win.addstr(10, 2, "r: címzett módosítása")
+            dialog_win.addstr(11, 2, "t: tárgy módosítása")
+            dialog_win.addstr(12, 2, "Esc: mégse")
 
-    # Tárgy bekérése
-    subject_win.refresh()
-    subject = subject_win.getstr(0, 0, dialog_config['dialog_width'] - 11).decode('utf-8')
+        dialog_win.refresh()
 
-    curses.noecho()
+        key = dialog_win.getch()
 
-    return recipient, subject
+        if key == 27:  # Esc
+            return None, None
+        if key == ord('a') and not recipient:
+            # Címválasztó megnyitása
+            selected_email = email_address_selector(stdscr)
+            if selected_email:
+                recipient = selected_email
+        elif key == ord('r'):
+            # Manuális címbevitel
+            dialog_win.addstr(7, 2, "Email cím:")
+            dialog_win.refresh()
+
+            recipient_win = curses.newwin(1, dialog_config['dialog_width'] - 14,
+                                        dialog_config['start_y'] + 7, dialog_config['start_x'] + 12)
+            curses.echo()
+            recipient_win.refresh()
+            new_recipient = recipient_win.getstr(0, 0, dialog_config['dialog_width'] - 15).decode('utf-8')
+            curses.noecho()
+
+            if new_recipient.strip():
+                recipient = new_recipient.strip()
+        elif key == ord('t') and recipient:
+            # Tárgy bevitele
+            dialog_win.addstr(7, 2, "Tárgy:")
+            dialog_win.refresh()
+
+            subject_win = curses.newwin(1, dialog_config['dialog_width'] - 10,
+                                      dialog_config['start_y'] + 7, dialog_config['start_x'] + 8)
+            curses.echo()
+            subject_win.refresh()
+            new_subject = subject_win.getstr(0, 0, dialog_config['dialog_width'] - 11).decode('utf-8')
+            curses.noecho()
+
+            if new_subject.strip():
+                subject = new_subject.strip()
+        elif key in (curses.KEY_ENTER, 10, 13) and recipient and subject:
+            return recipient, subject
 
 def show_email_result(dialog_win, dialog_config, message):
     """Email küldés eredményének megjelenítése"""
@@ -185,23 +349,34 @@ def show_email_result(dialog_win, dialog_config, message):
 
 def email_dialog(stdscr, file_path):
     """Email küldési dialógus ablak"""
+    # Addresses mappa létrehozása
+    ensure_addresses_directory()
+
     dialog_config = create_email_dialog_window(stdscr)
 
     # Fájl tartalmának beolvasása
     email_body = read_file_content(file_path)
 
-    # Dialógus ablak
+    # Beviteli mezők kezelése
+    recipient, subject = get_email_inputs(stdscr, dialog_config)
+
+    if not recipient or not subject:
+        return False
+
+    # Megerősítő dialógus
     dialog_win = curses.newwin(dialog_config['dialog_height'], dialog_config['dialog_width'],
                               dialog_config['start_y'], dialog_config['start_x'])
 
-    setup_dialog_ui(dialog_win, dialog_config, email_body)
+    dialog_win.clear()
+    dialog_win.box()
+    dialog_win.addstr(1, 2, "Email küldése - megerősítés", curses.A_BOLD)
+    dialog_win.addstr(3, 2, f"Címzett: {recipient}")
+    dialog_win.addstr(4, 2, f"Tárgy: {subject}")
+    dialog_win.addstr(6, 2, "Törzs előnézet:")
+    preview_text = email_body[:56] + "..." if len(email_body) > 56 else email_body
+    dialog_win.addstr(7, 2, preview_text[:dialog_config['dialog_width']-4])
 
-    # Beviteli mezők kezelése
-    recipient, subject = get_email_inputs(dialog_config)
-
-    # Megerősítés
-    dialog_win.addstr(10, 2, f"Küldés: {recipient}")
-    dialog_win.addstr(12, 2, "s: küldés | Esc: mégse   ")
+    dialog_win.addstr(10, 2, "s: küldés | Esc: mégse")
     dialog_win.refresh()
 
     while True:
@@ -210,6 +385,10 @@ def email_dialog(stdscr, file_path):
             # Email küldése
             config = load_config()
             success, message = send_email(config, recipient, subject, email_body)
+
+            # Email cím mentése ha sikeres volt a küldés
+            if success:
+                save_email_address(recipient)
 
             # Eredmény megjelenítése
             show_email_result(dialog_win, dialog_config, message)
