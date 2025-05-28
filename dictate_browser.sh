@@ -1,4 +1,5 @@
 #!/bin/bash
 
-cd ~/path/to/dictate || exit
+dictate_path=/path/to/dictate
+cd $dictate_path || exit
 bash -c "python3 diktatum_browser.py"
