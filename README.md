@@ -19,7 +19,17 @@ Majd másoljuk a `dictate.sh` és a `dictate_browser.sh` fájlokat a PATH-ba. Pl
 
 ### Dictate
 
-Az app az openai_whisper modeljére épül: tiny, base, small, medium és large. Minél nagyobb egy modell annál pontosabb, de lassabb a feldolgozás. Alapértelmezésként a base modell van beállítva, ezt a `dictate.sh` fájlban meg lehet változtatni.
+Az app az openai_whisper modeljeire épül: tiny, base, small, medium és large. Minél nagyobb egy modell annál pontosabb, de lassabb a feldolgozás. Alapértelmezésként a base modell van beállítva, ezt a `dictate.sh` fájlban meg lehet változtatni.
+
+Az egyes modellek mérete:
+
+| Modell     | Paraméterek száma | Méret (GB) | Megjegyzés                                |
+| ---------- | ----------------- | ---------- | ----------------------------------------- |
+| **tiny**   | \~39 M            | \~0.075 GB | Nagyon gyors, de kevésbé pontos           |
+| **base**   | \~74 M            | \~0.145 GB | Gyors, de alacsonyabb pontosság           |
+| **small**  | \~244 M           | \~0.49 GB  | Jó egyensúly sebesség és pontosság között |
+| **medium** | \~769 M           | \~1.55 GB  | Nagyobb pontosság, lassabb feldolgozás    |
+| **large**  | \~1550 M          | \~2.9 GB   | Legpontosabb, de a leglassabb             |
 
 A `dictate.sh` szkript indítja az appot.
 
